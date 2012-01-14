@@ -1,464 +1,129 @@
 /* 
  * JavaScript EventManager
- * SteelUnderpants.EventManager.js unit tests
- * Copyright 2011, Steel Underpants Software (Ryan Morlok)
+ * SteelUnderpants.EventManager.js
+ * Copyright 2010, Steel Underpants Software (Ryan Morlok)
  * Released under the MIT, BSD, and GPL Licenses.
  * 
  */
-module("Bind/Trigger");
+(function() {
 
-test("Simple Handler", function() {
-	var em = new SteelUnderpants.EventManager();
-	
-	var handlerCallCount = 0;
-	
-	var handler = function() {
-		handlerCallCount++;
-	}
-	
-	em.bind("a", handler);
-	
-	equal(handlerCallCount, 0, "Handler not called yet");
-	
-	em.trigger("a");
-	
-	equal(handlerCallCount, 1, "Handler called 1 time");
-	
-	em.trigger("a");
-	
-	equal(handlerCallCount, 2, "Handler called 2 times");
-});
+if( typeof window.SteelUnderpants === "undefined" )
+	window.SteelUnderpants = {};
 
-test("Multiple Handlers", function() {
-	var em = new SteelUnderpants.EventManager();
-	
-	var handler1CallCount = 0;
-	var handler2CallCount = 0;
-	
-	var handler1 = function() {
-		handler1CallCount++;
+window.SteelUnderpants.EventManager = function() {
+	// "This" object to be returned
+	var me = this;
+	if ( me.constructor !== window.SteelUnderpants.EventManager ) {
+		return new window.SteelUnderpants.EventManager();
 	}
-	var handler2 = function() {
-		handler2CallCount++;
-	}
-	
-	em.bind("a", handler1);
-	em.bind("a", handler2);
-	
-	equal(handler1CallCount, 0, "Handler 1 not called yet");
-	equal(handler2CallCount, 0, "Handler 2 not called yet");
-	
-	em.trigger("a");
-	
-	equal(handler1CallCount, 1, "Handler 1 called 1 time");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	
-	em.trigger("a");
-	
-	equal(handler1CallCount, 2, "Handler 1 called 2 times");
-	equal(handler2CallCount, 2, "Handler 2 called 2 times");
-});
 
-test("Multiple Events", function() {
-	var em = new SteelUnderpants.EventManager();
-	
-	var handlerCallCount = 0;
-	
-	var handler = function() {
-		handlerCallCount++;
-	}
-	
-	em.bind("a", handler);
-	em.bind("b", handler);
-	
-	equal(handlerCallCount, 0, "Handler not called yet");
-	
-	em.trigger("a");
-	
-	equal(handlerCallCount, 1, "Handler called 1 time");
-	
-	em.trigger("b");
-	
-	equal(handlerCallCount, 2, "Handler called 2 times");
-});
+	// Mapping object from event name to array of objects that hold handlers
+	var handlers = {};
 
-test("Multiple Events/Handlers", function() {
-	var em = new SteelUnderpants.EventManager();
-	
-	var handler1CallCount = 0;
-	var handler2CallCount = 0;
-	
-	var handler1 = function() {
-		handler1CallCount++;
-	}
-	var handler2 = function() {
-		handler2CallCount++;
-	}
-	
-	em.bind("a", handler1);
-	em.bind("b", handler2);
-	
-	equal(handler1CallCount, 0, "Handler 1 not called yet");
-	equal(handler2CallCount, 0, "Handler 2 not called yet");
-	
-	em.trigger("a");
-	
-	equal(handler1CallCount, 1, "Handler 1 called 1 time");
-	equal(handler2CallCount, 0, "Handler 2 not called yet");
-	
-	em.trigger("b");
-	
-	equal(handler1CallCount, 1, "Handler 1 called 1 time");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-});
+	me.bind = function(event, handler) {
+		if (!event) {
+			throw "Event must be specified.";
+		}
 
-test("Namespaced", function() {
-	var em = new SteelUnderpants.EventManager();
-	
-	var handlerCallCount = 0;
-	
-	var handler = function() {
-		handlerCallCount++;
-	}
-	
-	em.bind("a.foo", handler);
-	em.bind("b.foo", handler);
-	
-	equal(handlerCallCount, 0, "Handler not called yet");
-	
-	em.trigger("a");
-	
-	equal(handlerCallCount, 1, "Handler called 1 time");
-	
-	em.trigger("b");
-	
-	equal(handlerCallCount, 2, "Handler called 2 times");
-});
+		if (!handler) {
+			throw "Handler must be specified.";
+		}
 
-test("Arguments", function() {
-	var em = new SteelUnderpants.EventManager();
-	
-	var paramA;
-	var paramB;
-	var thisObj;
-	
-	var handler = function(a, b) {
-		thisObj = this;
-		paramA = a;
-		paramB = b;
-	}
-	
-	em.bind("a", handler);
-	
-	same(thisObj, undefined, "paramA undefined");
-	same(paramA, undefined, "paramA undefined");
-	same(paramB, undefined, "paramB undefined");
-	
-	var tmpThis = {};
-	em.trigger("a", tmpThis, "x", "y");
-	
-	same(thisObj, tmpThis, "this object set")
-	same(paramA, "x", "paramA x");
-	same(paramB, "y", "paramB y");
-});
+		if ( typeof handler !== "function" ) {
+			throw "Handler must me function.";
+		}
 
-test("Trigger Unbound Event", function() {
-	var em = new SteelUnderpants.EventManager();
-	
-	em.trigger("a", {}, "x", "y");
-	
-	ok(true, "No errors");
-});
+		var namespaceSeparator = event.indexOf(".");
+		if (namespaceSeparator >= 0) {
+			var eventName = event.substr(0, namespaceSeparator);
+			var namespace = event.substr(namespaceSeparator+1);	
+		} else {
+			var eventName = event;
+			var namespace = "";
+		}
 
-module("Unbind");
+		if (!handlers[eventName]) {
+			handlers[eventName] = [];
+		}
 
-test("Simple Unbind", function() {
-	var em = new SteelUnderpants.EventManager();
-	
-	var handlerCallCount = 0;
-	
-	var handler = function() {
-		handlerCallCount++;
-	}
-	
-	em.bind("a", handler);
-	
-	equal(handlerCallCount, 0, "Handler not called yet");
-	
-	em.trigger("a");
-	
-	equal(handlerCallCount, 1, "Handler called 1 time");
-	
-	em.unbind("a");
-	
-	equal(handlerCallCount, 1, "Handler called 1 time");
-	
-	em.trigger("a");
-	
-	equal(handlerCallCount, 1, "Handler called 1 time");
-});
+		handlers[eventName].push({
+			namespace: namespace,
+			handler: handler
+		});
 
-test("Unbind All with Namespaced", function() {
-	var em = new SteelUnderpants.EventManager();
-	
-	var handler1CallCount = 0;
-	var handler2CallCount = 0;
-	
-	var handler1 = function() {
-		handler1CallCount++;
-	}
-	var handler2 = function() {
-		handler2CallCount++;
-	}
-	
-	em.bind("a", handler1);
-	em.bind("a.foo", handler2);
-	
-	equal(handler1CallCount, 0, "Handler 1 not called yet");
-	equal(handler2CallCount, 0, "Handler 2 not called yet");
-	
-	em.trigger("a");
-	
-	equal(handler1CallCount, 1, "Handler 1 called 1 time");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	
-	em.unbind("a");
-	
-	equal(handler1CallCount, 1, "Handler 1 called 1 time");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	
-	em.trigger("a");
-	
-	equal(handler1CallCount, 1, "Handler 1 called 1 time");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-});
+	};
 
-test("Unbind Namespaced", function() {
-	var em = new SteelUnderpants.EventManager();
-	
-	var handler1CallCount = 0;
-	var handler2CallCount = 0;
-	
-	var handler1 = function() {
-		handler1CallCount++;
-	}
-	var handler2 = function() {
-		handler2CallCount++;
-	}
-	
-	em.bind("a", handler1);
-	em.bind("a.foo", handler2);
-	
-	equal(handler1CallCount, 0, "Handler 1 not called yet");
-	equal(handler2CallCount, 0, "Handler 2 not called yet");
-	
-	em.trigger("a");
-	
-	equal(handler1CallCount, 1, "Handler 1 called 1 time");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	
-	em.unbind("a.foo");
-	
-	equal(handler1CallCount, 1, "Handler 1 called 1 time");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	
-	em.trigger("a");
-	
-	equal(handler1CallCount, 2, "Handler 1 called 2 times");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-});
+	me.trigger = function(event, thisObject) {
+		var handlerArgs = [];
+		if (arguments.length > 2) {
+			for(var i = 2; i < arguments.length; i++) {
+				handlerArgs.push(arguments[i]);
+			}
+		}
 
-test("Unbind All Namespaced", function() {
-	var em = new SteelUnderpants.EventManager();
-	
-	var handler1CallCount = 0;
-	var handler2CallCount = 0;
-	var handler3CallCount = 0;
-	
-	var handler1 = function() {
-		handler1CallCount++;
-	}
-	var handler2 = function() {
-		handler2CallCount++;
-	}
-	var handler3 = function() {
-		handler3CallCount++;
-	}
-	
-	em.bind("a", handler1);
-	em.bind("a.foo", handler2);
-	em.bind("b.foo", handler3);
-	
-	equal(handler1CallCount, 0, "Handler 1 not called yet");
-	equal(handler2CallCount, 0, "Handler 2 not called yet");
-	equal(handler3CallCount, 0, "Handler 3 not called yet");
-	
-	em.trigger("a");
-	
-	equal(handler1CallCount, 1, "Handler 1 called 1 time");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	equal(handler3CallCount, 0, "Handler 3 not called yet");
-	
-	em.trigger("b");
-	
-	equal(handler1CallCount, 1, "Handler 1 called 1 time");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	equal(handler3CallCount, 1, "Handler 3 called 1 time");
-	
-	em.unbind(".foo");
-	
-	equal(handler1CallCount, 1, "Handler 1 called 1 time");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	equal(handler3CallCount, 1, "Handler 3 called 1 time");
-	
-	em.trigger("a");
-	
-	equal(handler1CallCount, 2, "Handler 1 called 2 times");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	equal(handler3CallCount, 1, "Handler 3 called 1 time");
-	
-	em.trigger("b");
-	
-	equal(handler1CallCount, 2, "Handler 1 called 2 times");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	equal(handler3CallCount, 1, "Handler 3 called 1 time");
-});
+		var eventHandlers = handlers[event] || [];
+		var handlersLength = eventHandlers.length;
+		for (var i = 0; i < handlersLength; i++) {
+			eventHandlers[i].handler.apply(thisObject, handlerArgs);
+		} 
+	};
 
-test("Unbind Function", function() {
-	var em = new SteelUnderpants.EventManager();
-	
-	var handler1CallCount = 0;
-	var handler2CallCount = 0;
-	var handler3CallCount = 0;
-	
-	var handler1 = function() {
-		handler1CallCount++;
-	}
-	var handler2 = function() {
-		handler2CallCount++;
-	}
-	var handler3 = function() {
-		handler3CallCount++;
-	}
-	
-	em.bind("a", handler1);
-	em.bind("a", handler2);
-	
-	equal(handler1CallCount, 0, "Handler 1 not called yet");
-	equal(handler2CallCount, 0, "Handler 2 not called yet");
-	
-	em.trigger("a");
-	
-	equal(handler1CallCount, 1, "Handler 1 called 1 time");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	
-	em.unbind(handler1);
-	
-	equal(handler1CallCount, 1, "Handler 1 called 1 time");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	
-	em.trigger("a");
-	
-	equal(handler1CallCount, 1, "Handler 1 called 1 time");
-	equal(handler2CallCount, 2, "Handler 2 called 2 times");
-});
+	me.unbind = function(a, b) {
+		if (typeof a === "string") {
+			var dotIndex = a.indexOf(".");
+			if (dotIndex >= 0) {
+				var eventName = a.substr(0, dotIndex);
+				var namespace = a.substr(dotIndex+1);
+			} else {
+				var eventName = a;
+			}
+		} else {
+			var handler = a;
+		}
 
-test("Unbind Function Across Multipe Events", function() {
-	var em = new SteelUnderpants.EventManager();
-	
-	var handler1CallCount = 0;
-	var handler2CallCount = 0;
-	var handler3CallCount = 0;
-	
-	var handler1 = function() {
-		handler1CallCount++;
-	}
-	var handler2 = function() {
-		handler2CallCount++;
-	}
-	var handler3 = function() {
-		handler3CallCount++;
-	}
-	
-	em.bind("a", handler1);
-	em.bind("a", handler2);
-	em.bind("b", handler1);
-	
-	equal(handler1CallCount, 0, "Handler 1 not called yet");
-	equal(handler2CallCount, 0, "Handler 2 not called yet");
-	
-	em.trigger("a");
-	
-	equal(handler1CallCount, 1, "Handler 1 called 1 time");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	
-	em.trigger("b");
-	
-	equal(handler1CallCount, 2, "Handler 1 called 2 times");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	
-	em.unbind(handler1);
-	
-	equal(handler1CallCount, 2, "Handler 1 called 2 times");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	
-	em.trigger("a");
-	
-	equal(handler1CallCount, 2, "Handler 1 called 2 times");
-	equal(handler2CallCount, 2, "Handler 2 called 2 times");
-	
-	em.trigger("b");
-	
-	equal(handler1CallCount, 2, "Handler 1 called 2 times");
-	equal(handler2CallCount, 2, "Handler 2 called 2 times");
-});
+		if (!handler && typeof b === "function") {
+			var handler = b;
+		}
 
-test("Unbind Event + Function", function() {
-	var em = new SteelUnderpants.EventManager();
-	
-	var handler1CallCount = 0;
-	var handler2CallCount = 0;
-	var handler3CallCount = 0;
-	
-	var handler1 = function() {
-		handler1CallCount++;
-	}
-	var handler2 = function() {
-		handler2CallCount++;
-	}
-	var handler3 = function() {
-		handler3CallCount++;
-	}
-	
-	em.bind("a", handler1);
-	em.bind("a", handler2);
-	em.bind("b", handler1);
-	
-	equal(handler1CallCount, 0, "Handler 1 not called yet");
-	equal(handler2CallCount, 0, "Handler 2 not called yet");
-	
-	em.trigger("a");
-	
-	equal(handler1CallCount, 1, "Handler 1 called 1 time");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	
-	em.trigger("b");
-	
-	equal(handler1CallCount, 2, "Handler 1 called 2 times");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	
-	em.unbind("a", handler1);
-	
-	equal(handler1CallCount, 2, "Handler 1 called 2 times");
-	equal(handler2CallCount, 1, "Handler 2 called 1 time");
-	
-	em.trigger("a");
-	
-	equal(handler1CallCount, 2, "Handler 1 called 2 times");
-	equal(handler2CallCount, 2, "Handler 2 called 2 times");
-	
-	em.trigger("b");
-	
-	equal(handler1CallCount, 3, "Handler 1 called 3 times");
-	equal(handler2CallCount, 2, "Handler 2 called 1 times");
-});
+		function matches(thisEventName, handlerObject) {
+			return (!eventName || thisEventName === eventName) &&
+				(!namespace || handlerObject.namespace === namespace) &&
+				(!handler || handlerObject.handler === handler);
+		}
+
+		function removeHandlers(eventNames) {
+			for(var event in eventNames) {
+				if (eventNames.hasOwnProperty(event)) {
+
+					var thisEventHandlers = handlers[event];
+					var thisEventHanldersLength = thisEventHandlers.length;
+					var resultingEventHandlers = [];
+
+					for(var i = 0; i < thisEventHanldersLength; i++) {
+						if (!matches(event, thisEventHandlers[i])) {
+							resultingEventHandlers.push(thisEventHandlers[i]);
+						}
+					}
+
+					if (resultingEventHandlers.length > 0) {
+						handlers[event] = resultingEventHandlers;
+					} else {
+						delete handlers[event];
+					}
+				}
+			}
+		}
+
+		if( eventName ) {
+			var tmp = {};
+			tmp[eventName] = true;
+			removeHandlers(tmp);
+		} else {
+			removeHandlers(handlers);
+		}
+	};
+
+	return me;
+};
+
+})();
